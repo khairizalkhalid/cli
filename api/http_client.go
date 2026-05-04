@@ -1,9 +1,12 @@
 package api
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -65,6 +68,23 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	if opts.EnableCache {
 		clientOpts.EnableCache = opts.EnableCache
 		clientOpts.CacheTTL = opts.CacheTTL
+	}
+
+	// GH_CA_BUNDLE allows specifying a custom CA certificate file. The CA is
+	// merged into the system cert pool so all hosts continue to work normally.
+	// This is useful when connecting to a GitHub Enterprise instance whose TLS
+	// certificate is signed by a private CA not trusted by the OS.
+	if caBundle := os.Getenv("GH_CA_BUNDLE"); caBundle != "" {
+		if caCert, err := os.ReadFile(caBundle); err == nil {
+			pool, _ := x509.SystemCertPool()
+			if pool == nil {
+				pool = x509.NewCertPool()
+			}
+			pool.AppendCertsFromPEM(caCert)
+			clientOpts.Transport = &http.Transport{
+				TLSClientConfig: &tls.Config{RootCAs: pool},
+			}
+		}
 	}
 
 	client, err := ghAPI.NewHTTPClient(clientOpts)
