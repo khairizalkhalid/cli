@@ -1,0 +1,77 @@
+name: Update Homebrew Formula
+
+on:
+  push:
+    tags:
+      - 'v*-ca-bundle.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v2.93.0-ca-bundle.1)'
+        required: true
+        type: string
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ inputs.version }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          # Extract version for formula (e.g., v2.93.0-ca-bundle.1 -> 2.93.0)
+          GH_VERSION=$(echo $TAG | sed 's/^v//' | sed 's/-ca-bundle\.[0-9]*$//')
+          echo "gh_version=$GH_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-tap
+          token: ${{ secrets.GH_PAT }}
+          path: tap
+
+      - name: Download tarball and compute sha256
+        id: sha
+        run: |
+          TAG=${{ steps.tag.outputs.tag }}
+          URL="https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz"
+          echo "Downloading from: $URL"
+          curl -sL "$URL" -o /tmp/gh.tar.gz
+          SHA256=$(sha256sum /tmp/gh.tar.gz | cut -d' ' -f1)
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "Computed sha256: $SHA256"
+
+      - name: Update formula
+        run: |
+          cd tap
+          TAG=${{ steps.tag.outputs.tag }}
+          GH_VERSION=${{ steps.sha.outputs.gh_version }}
+          SHA256=${{ steps.sha.outputs.sha256 }}
+          
+          # Update the formula file
+          sed -i "s|url \"https://github.com/.*/archive/refs/tags/v.*-ca-bundle.*.tar.gz\"|url \"https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz\"|" Formula/gh.rb
+          sed -i "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Formula/gh.rb
+          sed -i "s/gh_version = \".*\"/gh_version = \"${GH_VERSION}\"/" Formula/gh.rb
+          
+          echo "Updated Formula/gh.rb:"
+          cat Formula/gh.rb
+
+      - name: Commit and push formula
+        run: |
+          cd tap
+          git config user.name "${{ github.repository_owner }}"
+          git config user.email "${{ github.repository_owner }}@users.noreply.github.com"
+          
+          TAG=${{ steps.tag.outputs.tag }}
+          GH_VERSION=${{ steps.tag.outputs.gh_version }}
+          REPO="${{ github.repository }}"
+          
+          git add Formula/gh.rb
+          git commit -m "chore: bump gh to ${TAG}" -m "Update gh formula to ${TAG}" -m "- Version: ${GH_VERSION}" -m "- Source: ${REPO}@${TAG}"
+          
+          git push
