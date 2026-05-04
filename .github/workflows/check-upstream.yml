@@ -2,8 +2,8 @@ name: Check Upstream Release
 
 on:
   schedule:
-    # Run every Friday at 6 PM UTC (Saturday 2 AM Malaysia)
-    - cron: '0 18 * * 5'
+    # Run daily at 12 AM Malaysia Time (4 PM UTC)
+    - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
