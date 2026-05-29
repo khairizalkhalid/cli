@@ -57,6 +57,7 @@ jobs:
           sed -i "s|url \"https://github.com/.*/archive/refs/tags/v.*-ca-bundle.*.tar.gz\"|url \"https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz\"|" Formula/gh.rb
           sed -i "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Formula/gh.rb
           sed -i "s/gh_version = \".*\"/gh_version = \"${GH_VERSION}\"/" Formula/gh.rb
+          sed -i "s/gh version [0-9]\+\.[0-9]\+\.[0-9]\+/gh version ${GH_VERSION}/" Formula/gh.rb
           
           echo "Updated Formula/gh.rb:"
           cat Formula/gh.rb
@@ -72,6 +73,10 @@ jobs:
           REPO="${{ github.repository }}"
           
           git add Formula/gh.rb
+          if git diff --cached --quiet; then
+            echo "No changes to commit. Formula is already up to date."
+            exit 0
+          fi
           git commit -m "chore: bump gh to ${TAG}" -m "Update gh formula to ${TAG}" -m "- Version: ${GH_VERSION}" -m "- Source: ${REPO}@${TAG}"
           
           git push
