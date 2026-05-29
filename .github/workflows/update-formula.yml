@@ -50,7 +50,7 @@ jobs:
         run: |
           cd tap
           TAG=${{ steps.tag.outputs.tag }}
-          GH_VERSION=${{ steps.sha.outputs.gh_version }}
+          GH_VERSION=${{ steps.tag.outputs.gh_version }}
           SHA256=${{ steps.sha.outputs.sha256 }}
           
           # Update the formula file
